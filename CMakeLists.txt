@@ -2,11 +2,6 @@ project(luarocks)
 cmake_minimum_required(VERSION 2.8)
 
 ###
-# Search for Dependencies
-###
-find_package(Lua51 REQUIRED)
-
-###
 # Configuration Options
 ###
 
@@ -46,6 +41,13 @@ option(LUAROCKS_FORCE_CONFIG
 	"Use a single config location. Do not use the $LUAROCKS_CONFIG variable or the user's home directory. Useful to avoid conflicts when LuaRocks is embedded within an application."
 	OFF)
 
+if(WIN32)
+	option(LUAROCKS_INSTALL_BUNDLED_LUA "Should we use the Lua binaries bundled with LuaRocks?" ON)
+endif()
+
+###
+# Search for Dependencies
+###
 
 if(WIN32)
 	set(LUAROCKS_DOWNLOADER wget)
@@ -87,9 +89,12 @@ else()
 	endif()
 endif()
 
-find_program(LUA_INTERPRETER lua${LUAROCKS_LUA_SUFFIX})
-if(NOT LUA_INTERPRETER)
-	message(FATAL_ERROR "Need a Lua interpreter!")
+if(NOT LUAROCKS_INSTALL_BUNDLED_LUA)
+	find_package(Lua51 REQUIRED)
+	find_program(LUA_INTERPRETER lua${LUAROCKS_LUA_SUFFIX})
+	if(NOT LUA_INTERPRETER)
+		message(FATAL_ERROR "Need a Lua interpreter!")
+	endif()
 endif()
 
 # Make all possibly-relative paths absolute (but don't overwrite the cache
@@ -115,7 +120,7 @@ if(WIN32)
 	set(LUAROCKS_UNAME_M x86)
 else()
 	set(LUAROCKS_UNAME_S ${CMAKE_SYSTEM_NAME})
-	if(NOT DEFINEDLUAROCKS_UNAME_M)
+	if(NOT DEFINED LUAROCKS_UNAME_M)
 		execute_process(COMMAND uname -m
 			OUTPUT_VARIABLE LUAROCKS_UNAME_M
 			OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -124,13 +129,6 @@ else()
 endif()
 
 # Analysis for site_config
-get_filename_component(LUA_INTERPRETER_BASENAME "${LUA_INTERPRETER}" NAME_WE)
-if(NOT LUA_INTERPRETER_BASENAME STREQUAL "lua")
-	set(LUAROCKS_INTERPRETER_LINE "LUA_INTERPRETER=[[${LUA_INTERPRETER_BASENAME}]]")
-endif()
-
-
-get_filename_component(LUA_INTERPRETER_DIR "${LUA_INTERPRETER}" PATH)
 
 # TODO these are often wrong on other platforms
 set(PREFIX "${CMAKE_INSTALL_PREFIX}")
@@ -144,9 +142,25 @@ get_filename_component(LIBDIR "${LUA_LIBRARY}" PATH)
 set(LUADIR_RELATIVE lua)
 get_filename_component(LUADIR "${CMAKE_INSTALL_PREFIX}/${LUADIR_RELATIVE}" ABSOLUTE)
 
+if(LUAROCKS_INSTALL_BUNDLED_LUA)
+	set(LUA_INTERPRETER "${BINDIR}/lua5.1.exe")
+	set(INCDIR_RELATIVE include)
+	set(LIBDIR "${BINDIR}")
+	set(LUA_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/${INCDIR_RELATIVE}")
+	add_subdirectory(win32/lua5.1)
+endif()
+
 #set(INCDIR_RELATIVE include)
 #get_filename_component(INCDIR "${CMAKE_INSTALL_PREFIX}/${INCDIR_RELATIVE}" ABSOLUTE)
 set(INCDIR "${LUA_INCLUDE_DIR}")
+
+
+get_filename_component(LUA_INTERPRETER_BASENAME "${LUA_INTERPRETER}" NAME)
+if(NOT LUA_INTERPRETER_BASENAME STREQUAL "lua")
+	set(LUAROCKS_INTERPRETER_LINE "LUA_INTERPRETER=[[${LUA_INTERPRETER_BASENAME}]]")
+endif()
+
+get_filename_component(LUA_INTERPRETER_DIR "${LUA_INTERPRETER}" PATH)
 
 message(STATUS "Installation prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "LuaRocks configuration directory: ${LUAROCKS_SYSCONFDIR}")
