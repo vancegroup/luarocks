@@ -46,9 +46,46 @@ option(LUAROCKS_FORCE_CONFIG
 	"Use a single config location. Do not use the $LUAROCKS_CONFIG variable or the user's home directory. Useful to avoid conflicts when LuaRocks is embedded within an application."
 	OFF)
 
-## TODO make these configurable
-set(LUAROCKS_DOWNLOADER wget)
-set(LUAROCKS_MD5CHECKER md5sum)
+
+if(WIN32)
+	set(LUAROCKS_DOWNLOADER wget)
+	set(LUAROCKS_MD5CHECKER md5sum)
+else()
+	find_program(WGET_EXECUTABLE wget)
+	find_program(CURL_EXECUTABLE curl)
+	if(WGET_EXECUTABLE)
+		set(DOWNLOADER_DEFAULT "wget")
+	elseif(CURL_EXECUTABLE)
+		set(DOWNLOADER_DEFAULT "curl")
+	endif()
+
+	if(NOT DEFINED LUAROCKS_DOWNLOADER)
+		if(NOT DOWNLOADER_DEFAULT)
+			message(FATAL_ERROR "Could not find curl or wget, and LUAROCKS_DOWNLOADER not defined!")
+		endif()
+		set(LUAROCKS_DOWNLOADER "${DOWNLOADER_DEFAULT}" CACHE STRING
+			"Whether to use wget or curl as downloader.")
+	endif()
+
+	find_program(MD5SUM_EXECUTABLE md5sum)
+	find_program(MD5_EXECUTABLE md5)
+	find_program(OPENSSL_EXECUTABLE openssl)
+
+	if(MD5SUM_EXECUTABLE)
+		set(CHECKER_DEFAULT "md5sum")
+	elseif(MD5_EXECUTABLE)
+		set(CHECKER_DEFAULT "md5")
+	elseif(OPENSSL_EXECUTABLE)
+		set(CHECKER_DEFAULT "openssl")
+	endif()
+	if(NOT DEFINED LUAROCKS_MD5CHECKER)
+		if(NOT CHECKER_DEFAULT)
+			message(FATAL_ERROR "Could not find md5sum, md5, or openssl utility, and LUAROCKS_MD5CHECKER not defined!")
+		endif()
+		set(LUAROCKS_MD5CHECKER "${CHECKER_DEFAULT}" CACHE STRING
+			"Whether to use md5sum, md5, or openssl utility as MD5 checker.")
+	endif()
+endif()
 
 find_program(LUA_INTERPRETER lua${LUAROCKS_LUA_SUFFIX})
 if(NOT LUA_INTERPRETER)
