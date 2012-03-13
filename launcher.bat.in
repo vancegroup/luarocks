@@ -1,0 +1,8 @@
+@echo off
+setlocal
+set BINDIR=%~dp0
+set LUADIR=%BINDIR%@LUADIR_RELATIVE_TO_BINDIR@
+set LUA_PATH=%LUADIR%\?.lua;%LUADIR%\?\init.lua;%LUA_PATH%
+set PATH=@LUA_INTERPRETER_DIR@;%BINDIR%;%PATH%
+"@LUA_INTERPRETER_BASENAME@" "%BINDIR%\@SCRIPTNAME@.lua" %*
+endlocal

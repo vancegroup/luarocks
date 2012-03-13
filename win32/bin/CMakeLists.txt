@@ -1,0 +1,23 @@
+install(PROGRAMS
+	7z.dll
+	7z.exe
+	chmod.exe
+	cp.exe
+	find.exe
+	libeay32.dll
+	libiconv2.dll
+	libintl3.dll
+	libssl32.dll
+	ls.exe
+	md5sum.exe
+	mkdir.exe
+	mv.exe
+	pwd.exe
+	rclauncher.o
+	rclauncher.obj
+	rm.exe
+	rmdir.exe
+	test.exe
+	uname.exe
+	wget.exe
+	DESTINATION ${BINDIR_RELATIVE})
