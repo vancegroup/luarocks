@@ -9,6 +9,7 @@ set(CMD
 	--tree=${ROCKS_TREE}
 	LUA_LIBDIR=${LUA_LIBDIR}
 	LUA_BINDIR=${LUA_BINDIR}
+	LUALIB=${LUALIB}
 	install
 	"${ROCK}")
 
