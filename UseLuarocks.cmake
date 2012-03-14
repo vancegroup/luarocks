@@ -52,9 +52,9 @@ function(luarocks_install _target _rock _rockstree)
 			-E
 			touch
 			"${STAMPFILE}"
+		COMMENT "Running LuaRocks to install ${_rock} to ${_rockstree}"
 		DEPENDS ${LUA_INTERPRETER} ${LUA_LIBRARY} "${CMAKE_CURRENT_BINARY_DIR}/luarocks_install.cmake" "${LUAROCKS_SITECONFIG_BUILDLOCATION}/luarocks/site_config.lua"
 		VERBATIM
 	)
-	add_custom_target(${_target} ALL DEPENDS "${STAMPFILE}"
-		COMMENT "Running LuaRocks to install ${_rock} to ${_rockstree}")
+	add_custom_target(${_target} ALL DEPENDS "${STAMPFILE}")
 endfunction()
