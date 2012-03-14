@@ -5,6 +5,10 @@ cmake_minimum_required(VERSION 2.8)
 # Configuration Options
 ###
 
+if(NOT ("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}"))
+	set(LUAROCKS_SUBPROJECT_BUILD ON)
+endif()
+
 # LUA_VERSION
 if(NOT DEFINED LUAROCKS_LUA_VERSION)
 	set(LUAROCKS_LUA_VERSION 5.1 CACHE STRING "Use specific Lua version: 5.1 or 5.2 (EXPERIMENTAL)")
@@ -41,9 +45,18 @@ option(LUAROCKS_FORCE_CONFIG
 	"Use a single config location. Do not use the $LUAROCKS_CONFIG variable or the user's home directory. Useful to avoid conflicts when LuaRocks is embedded within an application."
 	OFF)
 
-if(WIN32)
+if(WIN32 AND NOT LUAROCKS_SUBPROJECT_BUILD)
 	option(LUAROCKS_INSTALL_BUNDLED_LUA "Should we use the Lua binaries bundled with LuaRocks?" ON)
 endif()
+
+if(LUAROCKS_SUBPROJECT_BUILD)
+	mark_as_advanced(LUAROCKS_LUA_VERSION
+		LUAROCKS_ROCKS_TREE
+		LUAROCKS_LUA_SUFFIX
+		LUAROCKS_SYSCONFDIR
+		LUAROCKS_FORCE_CONFIG)
+endif()
+
 
 ###
 # Search for Dependencies
