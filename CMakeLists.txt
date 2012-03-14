@@ -182,6 +182,19 @@ if(WIN32)
 	add_subdirectory(win32/bin)
 endif()
 
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/buildtree")
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/buildtree/luarocks")
+set(LUAROCKS_SITECONFIG_BUILDLOCATION "${CMAKE_CURRENT_BINARY_DIR}/buildtree" CACHE INTERNAL "" FORCE)
+
+if(MSVC)
+	set(WRAPPER "${CMAKE_CURRENT_SOURCE_DIR}/win32/bin/rclauncher.obj")
+else()
+	set(WRAPPER "${CMAKE_CURRENT_SOURCE_DIR}/win32/bin/rclauncher.o")
+endif()
+
+
+configure_file(buildtree_site_config.lua.in "${CMAKE_CURRENT_BINARY_DIR}/buildtree/luarocks/site_config.lua" @ONLY)
+
 add_subdirectory(src/bin)
 add_subdirectory(src/luarocks)
 
