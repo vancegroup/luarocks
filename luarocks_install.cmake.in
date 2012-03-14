@@ -1,10 +1,18 @@
 set(LUAROCKS_SITECONFIG_DIR "@LUAROCKS_SITECONFIG_BUILDLOCATION@")
-set(ENV{LUA_PATH} "${LUAROCKS_SITECONFIG_DIR}/?.lua;${LUAROCKS_SRC_DIR}/?.lua;${LUAROCKS_SRC_DIR}/?/init.lua;$ENV{LUA_PATH}")
+set(ENV{LUA_PATH}
+	"${LUAROCKS_SITECONFIG_DIR}/?.lua;${LUAROCKS_SRC_DIR}/?.lua;${LUAROCKS_SRC_DIR}/?/init.lua;$ENV{LUA_PATH}")
 set(ENV{PATH} "${EXTRAPATH}@DELIM@$ENV{PATH}")
 
-set(CMD "${LUA_INTERPRETER}" "${LUAROCKS_SRC_DIR}/bin/luarocks" --tree=${ROCKS_TREE} LUA_LIBDIR=${LUA_LIBDIR} LUA_BINDIR=${LUA_BINDIR} install "${ROCK}")
+set(CMD
+	"${LUA_INTERPRETER}"
+	"${LUAROCKS_SRC_DIR}/bin/luarocks"
+	--tree=${ROCKS_TREE}
+	LUA_LIBDIR=${LUA_LIBDIR}
+	LUA_BINDIR=${LUA_BINDIR}
+	install
+	"${ROCK}")
 
 execute_process(COMMAND "${CMAKE_COMMAND}" -E echo Will run: ${CMD})
 
-execute_process(COMMAND "${CMAKE_COMMAND}" -E echo )
+execute_process(COMMAND "${CMAKE_COMMAND}" -E echo)
 execute_process(COMMAND ${CMD})

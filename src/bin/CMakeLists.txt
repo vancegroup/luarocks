@@ -5,6 +5,9 @@ if(WIN32)
 			RENAME ${fn}.lua)
 	endforeach()
 else()
-	install(PROGRAMS luarocks luarocks-admin
-		DESTINATION ${BINDIR_RELATIVE})
+	install(PROGRAMS
+		luarocks
+		luarocks-admin
+		DESTINATION
+		${BINDIR_RELATIVE})
 endif()

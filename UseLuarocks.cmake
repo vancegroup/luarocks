@@ -1,36 +1,56 @@
-get_filename_component(_useluarocks_mod_dir "${CMAKE_CURRENT_LIST_FILE}" PATH)
+get_filename_component(_useluarocks_mod_dir
+	"${CMAKE_CURRENT_LIST_FILE}"
+	PATH)
 
 function(luarocks_install _target _rock _rockstree)
 	set(LUAROCKS_BUILDTREE_EXTRAPATH)
 
 	if(TARGET "${LUA_INTERPRETER}")
-		set(LUAROCKS_BUILDTREE_LUA_INTERPRETER "$<TARGET_FILE:${LUA_INTERPRETER}>")
-		set(LUAROCKS_BUILDTREE_LUA_INTERPRETER_DIR "$<TARGET_FILE_DIR:${LUA_INTERPRETER}>")
+		set(LUAROCKS_BUILDTREE_LUA_INTERPRETER
+			"$<TARGET_FILE:${LUA_INTERPRETER}>")
+		set(LUAROCKS_BUILDTREE_LUA_INTERPRETER_DIR
+			"$<TARGET_FILE_DIR:${LUA_INTERPRETER}>")
 	else()
 		set(LUAROCKS_BUILDTREE_LUA_INTERPRETER "${LUA_INTERPRETER}")
-		get_filename_component(LUAROCKS_BUILDTREE_LUA_INTERPRETER_DIR "${LUAROCKS_BUILDTREE_LUA_INTERPRETER}" PATH)
+		get_filename_component(LUAROCKS_BUILDTREE_LUA_INTERPRETER_DIR
+			"${LUAROCKS_BUILDTREE_LUA_INTERPRETER}"
+			PATH)
 	endif()
-	list(APPEND LUAROCKS_BUILDTREE_EXTRAPATH "${LUAROCKS_BUILDTREE_LUA_INTERPRETER_DIR}")
+	list(APPEND
+		LUAROCKS_BUILDTREE_EXTRAPATH
+		"${LUAROCKS_BUILDTREE_LUA_INTERPRETER_DIR}")
 
 	if(TARGET ${LUA_LIBRARY})
 		set(LUAROCKS_BUILDTREE_LUA_LIBDIR "$<TARGET_FILE_DIR:${LUA_LIBRARY}>")
 	else()
-		get_filename_component(LUAROCKS_BUILDTREE_LUA_LIBDIR "${LUA_LIBRARY}" PATH)
+		get_filename_component(LUAROCKS_BUILDTREE_LUA_LIBDIR
+			"${LUA_LIBRARY}"
+			PATH)
 	endif()
-	list(APPEND LUAROCKS_BUILDTREE_EXTRAPATH "${LUAROCKS_BUILDTREE_LUA_LIBDIR}")
+	list(APPEND
+		LUAROCKS_BUILDTREE_EXTRAPATH
+		"${LUAROCKS_BUILDTREE_LUA_LIBDIR}")
 
 	set(LUAROCKS_BUILDTREE_SRC_DIR "${_useluarocks_mod_dir}/src")
 
 	if(WIN32)
 		# Path to unixy utilities
-		list(APPEND LUAROCKS_BUILDTREE_EXTRAPATH "${_useluarocks_mod_dir}/win32/bin")
+		list(APPEND
+			LUAROCKS_BUILDTREE_EXTRAPATH
+			"${_useluarocks_mod_dir}/win32/bin")
 		set(DELIM ";")
 	else()
-		string(REPLACE ";" ":" LUAROCKS_BUILDTREE_EXTRAPATH "${LUAROCKS_BUILDTREE_EXTRAPATH}")
+		string(REPLACE
+			";"
+			":"
+			LUAROCKS_BUILDTREE_EXTRAPATH
+			"${LUAROCKS_BUILDTREE_EXTRAPATH}")
 		set(DELIM ":")
 	endif()
 
-	configure_file("${_useluarocks_mod_dir}/luarocks_install.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/luarocks_install.cmake" @ONLY)
+	configure_file("${_useluarocks_mod_dir}/luarocks_install.cmake.in"
+		"${CMAKE_CURRENT_BINARY_DIR}/luarocks_install.cmake"
+		@ONLY)
 	set(STAMPFILE "${_rockstree}/../${_target}.stamp")
 	add_custom_command(OUTPUT "${STAMPFILE}"
 		COMMAND
