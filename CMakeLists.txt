@@ -97,19 +97,6 @@ if(NOT LUAROCKS_INSTALL_BUNDLED_LUA)
 	endif()
 endif()
 
-# Make all possibly-relative paths absolute (but don't overwrite the cache
-foreach(POSSIBLY_RELATIVE LUAROCKS_ROCKS_TREE LUAROCKS_SYSCONFDIR)
-	set(_rel OFF)
-	if("${${POSSIBLY_RELATIVE}}" STREQUAL "")
-		set(_rel ON)
-	elseif(NOT IS_ABSOLUTE "${${POSSIBLY_RELATIVE}}")
-		set(_rel ON)
-	endif()
-	if(_rel)
-		message(STATUS "Detected that ${POSSIBLY_RELATIVE}='${${POSSIBLY_RELATIVE}}' is relative")
-		get_filename_component(${POSSIBLY_RELATIVE} "${CMAKE_INSTALL_PREFIX}/${${POSSIBLY_RELATIVE}}" ABSOLUTE)
-	endif()
-endforeach()
 
 if(WIN32)
 	if(MSVC)
@@ -127,6 +114,21 @@ else()
 		set(LUAROCKS_UNAME_M "${LUAROCKS_UNAME_M}" CACHE STRING "")
 	endif()
 endif()
+
+# Make all possibly-relative paths absolute (but don't overwrite the cache
+foreach(POSSIBLY_RELATIVE LUAROCKS_ROCKS_TREE LUAROCKS_SYSCONFDIR)
+	set(_rel OFF)
+	if("${${POSSIBLY_RELATIVE}}" STREQUAL "")
+		set(_rel ON)
+	elseif(NOT IS_ABSOLUTE "${${POSSIBLY_RELATIVE}}")
+		set(_rel ON)
+	endif()
+	if(_rel)
+		message(STATUS "Detected that ${POSSIBLY_RELATIVE}='${${POSSIBLY_RELATIVE}}' is relative")
+		get_filename_component(${POSSIBLY_RELATIVE} "${CMAKE_INSTALL_PREFIX}/${${POSSIBLY_RELATIVE}}" ABSOLUTE)
+	endif()
+endforeach()
+
 
 # Analysis for site_config
 
