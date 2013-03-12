@@ -15,6 +15,13 @@ local util = require("luarocks.util")
 
 math.randomseed(os.time())
 
+--- Annotate command string for quiet execution.
+-- @param cmd string: A command-line string.
+-- @return string: The command-line, with silencing annotation.
+function quiet(cmd)
+   return cmd.." 1> /dev/null 2> /dev/null"
+end
+
 --- Return an absolute pathname from a potentially relative one.
 -- @param pathname string: pathname to convert.
 -- @param relative_to string or nil: path to prepend when making
@@ -85,4 +92,18 @@ end
 
 function copy_binary(filename, dest) 
    return fs.copy(filename, dest, "0755")
+end
+
+--- Move a file on top of the other.
+-- The new file ceases to exist under its original name,
+-- and takes over the name of the old file.
+-- On Unix this is done through a single rename operation.
+-- @param old_file The name of the original file,
+-- which will be the new name of new_file.
+-- @param new_file The name of the new file,
+-- which will replace old_file.
+-- @return boolean or (nil, string): True if succeeded, or nil and
+-- an error message.
+function replace_file(old_file, new_file)
+   return os.rename(new_file, old_file)
 end

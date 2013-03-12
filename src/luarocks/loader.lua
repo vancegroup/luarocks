@@ -26,7 +26,7 @@ rocks_trees = nil
 local function load_rocks_trees() 
    local any_ok = false
    local trees = {}
-   for _, tree in pairs(cfg.rocks_trees) do
+   for _, tree in ipairs(cfg.rocks_trees) do
       local manifest, err = manif_core.load_local_manifest(path.rocks_dir(tree))
       if manifest then
          any_ok = true
@@ -59,7 +59,7 @@ function add_context(name, version)
    end
 
    local providers = {}
-   for _, tree in pairs(rocks_trees) do
+   for _, tree in ipairs(rocks_trees) do
       local manifest = tree.manifest
 
       local pkgdeps
@@ -72,7 +72,7 @@ function add_context(name, version)
       for _, dep in ipairs(pkgdeps) do
          local pkg, constraints = dep.name, dep.constraints
    
-         for _, tree in pairs(rocks_trees) do
+         for _, tree in ipairs(rocks_trees) do
             local entries = tree.manifest.repository[pkg]
             if entries then
                for version, pkgs in pairs(entries) do
@@ -116,7 +116,7 @@ local function call_other_loaders(module, name, version, module_name)
          end
       end
    end
-   return nil, "Failed loading module "..module.." in LuaRocks rock "..name.." "..version
+   return "Failed loading module "..module.." in LuaRocks rock "..name.." "..version
 end
 
 --- Search for a module in the rocks trees
@@ -139,13 +139,13 @@ local function select_module(module, filter_module_name)
    end
 
    local providers = {}
-   for _, tree in pairs(rocks_trees) do
+   for _, tree in ipairs(rocks_trees) do
       local entries = tree.manifest.modules[module]
       if entries then
          for i, entry in ipairs(entries) do
             local name, version = entry:match("^([^/]*)/(.*)$")
             local module_name = tree.manifest.repository[name][version][1].modules[module]
-            if not type(module_name) == "string" then
+            if type(module_name) ~= "string" then
                error("Invalid format in manifest file (invalid data for "..tostring(name).." "..tostring(version)..")")
             end
             module_name = filter_module_name(module_name, name, version, tree.tree, i)
@@ -184,25 +184,9 @@ end
 
 --- Return the pathname of the file that would be loaded for a module.
 -- @param module string: module name (eg. "socket.core")
--- @return string, string, string: name of the rock containing the module
--- (eg. "luasocket"), version of the rock (eg. "2.0.2-1"),
--- filename of the module (eg. "/usr/local/lib/lua/5.1/socket/core.so")
+-- @return string: filename of the module (eg. "/usr/local/lib/lua/5.1/socket/core.so")
 function which(module)
-   local name, version, module_name = 
-      select_module(module, function(module_name, name, version, tree, i)
-         local deploy_dir
-         if module_name:match("%.lua$") then
-            deploy_dir = path.deploy_lua_dir(tree)
-            module_name = deploy_dir.."/"..module_name
-         else
-            deploy_dir = path.deploy_lib_dir(tree)
-            module_name = deploy_dir.."/"..module_name
-         end
-         if i > 1 then
-            module_name = path.versioned_name(module_name, deploy_dir, name, version)
-         end
-         return module_name
-      end)
+   local name, version, module_name = select_module(module, path.which_i)
    return module_name
 end
 
@@ -218,7 +202,7 @@ end
 function luarocks_loader(module)
    local name, version, module_name = pick_module(module)
    if not name then
-      return nil, "No LuaRocks module found for "..module
+      return "No LuaRocks module found for "..module
    else
       add_context(name, version)
       return call_other_loaders(module, name, version, module_name)

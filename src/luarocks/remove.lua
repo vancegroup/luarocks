@@ -6,7 +6,7 @@ module("luarocks.remove", package.seeall)
 local search = require("luarocks.search")
 local deps = require("luarocks.deps")
 local fetch = require("luarocks.fetch")
-local rep = require("luarocks.rep")
+local repos = require("luarocks.repos")
 local path = require("luarocks.path")
 local util = require("luarocks.util")
 local cfg = require("luarocks.cfg")
@@ -28,7 +28,7 @@ To override this check and force the removal, use --force.
 -- @param versions array of string: the versions to be deleted.
 -- @return array of string: an empty table if no packages depend on any
 -- of the given list, or an array of strings in "name/version" format.
-local function check_dependents(name, versions)
+local function check_dependents(name, versions, deps_mode)
    local dependents = {}
    local blacklist = {}
    blacklist[name] = {}
@@ -44,7 +44,7 @@ local function check_dependents(name, versions)
       for rock_version, _ in pairs(rock_versions) do
          local rockspec, err = fetch.load_rockspec(path.rockspec_file(rock_name, rock_version))
          if rockspec then
-            local _, missing = deps.match_deps(rockspec, blacklist)
+            local _, missing = deps.match_deps(rockspec, blacklist, deps_mode)
             if missing[name] then
                table.insert(dependents, { name = rock_name, version = rock_version })
             end
@@ -62,7 +62,7 @@ local function delete_versions(name, versions)
 
    for version, _ in pairs(versions) do
       util.printout("Removing "..name.." "..version.."...")
-      local ok, err = rep.delete_version(name, version)
+      local ok, err = repos.delete_version(name, version)
       if not ok then return nil, err end
    end
    
@@ -82,11 +82,11 @@ function run(...)
    if type(name) ~= "string" then
       return nil, "Argument missing, see help."
    end
-
-   if not flags["local"] and not fs.is_writable(cfg.rocks_dir) then
-      return nil, "Your user does not have write permissions in " .. cfg.rocks_dir ..
-                  " \n-- you may want to run as a privileged user or use your local tree with --local."
-   end
+   
+   local deps_mode = flags["deps-mode"] or cfg.deps_mode
+   
+   local ok, err = fs.check_command_permissions(flags)
+   if not ok then return nil, err end
 
    local results = {}
    search.manifest_search(results, cfg.rocks_dir, search.make_query(name, version))
@@ -102,7 +102,7 @@ function run(...)
       util.printout(name.." "..table.concat(util.keys(versions), ", ").."...")
       util.printout()
       
-      local dependents = check_dependents(name, versions)
+      local dependents = check_dependents(name, versions, deps_mode)
       
       if #dependents == 0 or flags["force"] then
          if #dependents > 0 then
@@ -114,7 +114,7 @@ function run(...)
          end
          local ok, err = delete_versions(name, versions)
          if not ok then return nil, err end
-         ok, err = manif.make_manifest(cfg.rocks_dir)
+         ok, err = manif.make_manifest(cfg.rocks_dir, deps_mode)
          if not ok then return nil, err end
       else
          if not second then

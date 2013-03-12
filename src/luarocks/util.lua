@@ -236,17 +236,42 @@ end
 -- @see sortedpairs
 local function sortedpairs_iterator(tbl, sort_function)
    local ks = keys(tbl)
-   table.sort(ks, sort_function or default_sort)
-   for _, k in ipairs(ks) do
-      coroutine.yield(k, tbl[k])
+   if not sort_function or type(sort_function) == "function" then
+      table.sort(ks, sort_function or default_sort)
+      for _, k in ipairs(ks) do
+         coroutine.yield(k, tbl[k])
+      end
+   else
+      local order = sort_function
+      local done = {}
+      for _, k in ipairs(order) do
+         local sub_order
+         if type(k) == "table" then
+            sub_order = k[2]
+            k = k[1]
+         end
+         if tbl[k] then
+            done[k] = true
+            coroutine.yield(k, tbl[k], sub_order)
+         end
+      end
+      table.sort(ks, default_sort)
+      for _, k in ipairs(ks) do
+         if not done[k] then
+            coroutine.yield(k, tbl[k])
+         end
+      end
    end
 end
 
 --- A table iterator generator that returns elements sorted by key,
 -- to be used in "for" loops.
 -- @param tbl table: The table to be iterated.
--- @param sort_function function or nil: An optional comparison function
--- to be used by table.sort when sorting keys.
+-- @param sort_function function or table or nil: An optional comparison function
+-- to be used by table.sort when sorting keys, or an array listing an explicit order
+-- for keys. If a value itself is an array, it is taken so that the first element
+-- is a string representing the field name, and the second element is a priority table
+-- for that key.
 -- @return function: the iterator function.
 function sortedpairs(tbl, sort_function)
    return coroutine.wrap(function() sortedpairs_iterator(tbl, sort_function) end)
@@ -274,6 +299,14 @@ function warning(msg)
    printerr("Warning: "..msg)
 end
 
+function title(msg, porcelain, underline)
+   if porcelain then return end
+   printout()
+   printout(msg)
+   printout((underline or "-"):rep(#msg))
+   printout()
+end
+
 -- from http://lua-users.org/wiki/SplitJoin
 -- by PhilippeLhoste
 function split_string(str, delim, maxNb)
@@ -288,7 +321,7 @@ function split_string(str, delim, maxNb)
    local pat = "(.-)" .. delim .. "()"
    local nb = 0
    local lastPos
-   for part, pos in string.gfind(str, pat) do
+   for part, pos in string.gmatch(str, pat) do
       nb = nb + 1
       result[nb] = part
       lastPos = pos
@@ -301,33 +334,41 @@ function split_string(str, delim, maxNb)
    return result
 end
 
---[[
-Author: Julio Manuel Fernandez-Diaz
-Date:   January 12, 2007
-(For Lua 5.1)
+--- Remove repeated entries from a path-style string.
+-- Example: given ("a;b;c;a;b;d", ";"), returns "a;b;c;d".
+-- @param list string: A path string (from $PATH or package.path)
+-- @param sep string: The separator
+function remove_path_dupes(list, sep)
+   assert(type(list) == "string")
+   assert(type(sep) == "string")
+   local parts = split_string(list, sep)
+   local final, entries = {}, {}
+   for _, part in ipairs(parts) do
+      if not entries[part] then
+         table.insert(final, part)
+         entries[part] = true
+      end
+   end
+   return table.concat(final, sep)
+end
 
-Formats tables with cycles recursively to any depth.
-The output is returned as a string.
-References to other tables are shown as values.
-Self references are indicated.
-
-The string returned is "Lua code", which can be procesed
-(in the case in which indent is composed by spaces or "--").
-Userdata and function keys and values are shown as strings,
-which logically are exactly not equivalent to the original code.
-
-This routine can serve for pretty formating tables with
-proper indentations, apart from printing them:
-
-io.write(table.show(t, "t"))   -- a typical use
-
-Heavily based on "Saving tables with cycles", PIL2, p. 113.
-
-Arguments:
-t is the table.
-name is the name of the table (optional)
-indent is a first indentation (optional).
---]]
+---
+-- Formats tables with cycles recursively to any depth.
+-- References to other tables are shown as values.
+-- Self references are indicated.
+-- The string returned is "Lua code", which can be procesed
+-- (in the case in which indent is composed by spaces or "--").
+-- Userdata and function keys and values are shown as strings,
+-- which logically are exactly not equivalent to the original code.
+-- This routine can serve for pretty formating tables with
+-- proper indentations, apart from printing them:
+-- io.write(table.show(t, "t"))   -- a typical use
+-- Written by Julio Manuel Fernandez-Diaz,
+-- Heavily based on "Saving tables with cycles", PIL2, p. 113.
+-- @param t table: is the table.
+-- @param name string: is the name of the table (optional)
+-- @param indent string: is a first indentation (optional).
+-- @return string: the pretty-printed table
 function show_table(t, name, indent)
    local cart     -- a container
    local autoref  -- for self references

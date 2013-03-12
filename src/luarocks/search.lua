@@ -185,22 +185,28 @@ end
 
 --- Search on all configured rocks servers.
 -- @param query table: A dependency query.
--- @return table or (nil, string): A table where keys are package names
+-- @return table: A table where keys are package names
 -- and values are tables matching version strings to an array of
 -- rocks servers; if no results are found, an empty table is returned.
--- In case of errors, nil and and error message are returned.
 function search_repos(query)
    assert(type(query) == "table")
 
    local results = {}
    for _, repo in ipairs(cfg.rocks_servers) do
-      local protocol, pathname = dir.split_url(repo)
-      if protocol == "file" then
-         repo = pathname
+      if type(repo) == "string" then
+         repo = { repo }
       end
-      local ok, err = manifest_search(results, repo, query)
-      if not ok then
-         util.warning("Failed searching manifest: "..err)
+      for _, mirror in ipairs(repo) do
+         local protocol, pathname = dir.split_url(mirror)
+         if protocol == "file" then
+            mirror = pathname
+         end
+         local ok, err = manifest_search(results, mirror, query)
+         if ok then
+            break
+         else
+            util.warning("Failed searching manifest: "..err)
+         end
       end
    end
    return results
@@ -262,10 +268,7 @@ end
 function find_suitable_rock(query)
    assert(type(query) == "table")
    
-   local results, err = search_repos(query)
-   if not results then
-      return nil, err
-   end
+   local results = search_repos(query)
    local first = next(results)
    if not first then
       return nil, "No results matching query were found."
@@ -279,27 +282,27 @@ end
 --- Print a list of rocks/rockspecs on standard output.
 -- @param results table: A table where keys are package names and versions
 -- are tables matching version strings to an array of rocks servers.
--- @param show_repo boolean or nil: Whether to show repository
--- @param long boolean or nil: Whether to show module files
--- information or not. Default is true.
-function print_results(results, show_repo, long)
+-- @param porcelain boolean or nil: A flag to force machine-friendly output.
+function print_results(results, porcelain)
    assert(type(results) == "table")
-   assert(type(show_repo) == "boolean" or not show_repo)
-   -- Force display of repo location for the time being
-   show_repo = true -- show_repo == nil and true or show_repo
+   assert(type(porcelain) == "boolean" or not porcelain)
    
    for package, versions in util.sortedpairs(results) do
-      util.printout(package)
+      if not porcelain then
+         util.printout(package)
+      end
       for version, repos in util.sortedpairs(versions, deps.compare_versions) do
-         if show_repo then
-            for _, repo in ipairs(repos) do
+         for _, repo in ipairs(repos) do
+            if porcelain then
+               util.printout(package, version, repo.arch, repo.repo)
+            else
                util.printout("   "..version.." ("..repo.arch..") - "..repo.repo)
             end
-         else
-            util.printout("   "..version)
          end
       end
-      util.printout()
+      if not porcelain then
+         util.printout()
+      end
    end
 end
 
@@ -312,8 +315,8 @@ end
 local function split_source_and_binary_results(results)
    local sources, binaries = {}, {}
    for name, versions in pairs(results) do
-      for version, repos in pairs(versions) do
-         for _, repo in ipairs(repos) do
+      for version, repositories in pairs(versions) do
+         for _, repo in ipairs(repositories) do
             local where = sources
             if repo.arch == "all" or repo.arch == cfg.arch then
                where = binaries
@@ -334,7 +337,7 @@ end
 -- @param name string: A rock name
 -- @param version string or nil: A version number may also be given.
 -- @return The result of the action function, or nil and an error message. 
-function act_on_src_or_rockspec(action, name, version)
+function act_on_src_or_rockspec(action, name, version, ...)
    assert(type(action) == "function")
    assert(type(name) == "string")
    assert(type(version) == "string" or not version)
@@ -343,14 +346,7 @@ function act_on_src_or_rockspec(action, name, version)
    query.arch = "src|rockspec"
    local results, err = find_suitable_rock(query)
    if type(results) == "string" then
-      return action(results)
-   elseif type(results) == "table" and next(results) then
-      util.printout("Multiple search results were returned.")
-      util.printout()
-      util.printout("Search results:")
-      util.printout("---------------")
-      print_results(results)
-      return nil, "Please narrow your query."
+      return action(results, ...)
    else
       return nil, "Could not find a result named "..name..(version and " "..version or "").."."
    end
@@ -375,25 +371,16 @@ function run(...)
    local query = make_query(name:lower(), version)
    query.exact_name = false
    local results, err = search_repos(query)
-   if not results then
-      return nil, err
-   end
-   util.printout()
-   util.printout("Search results:")
-   util.printout("===============")
-   util.printout()
+   local porcelain = flags["porcelain"]
+   util.title("Search results:", porcelain, "=")
    local sources, binaries = split_source_and_binary_results(results)
    if next(sources) and not flags["binary"] then
-      util.printout("Rockspecs and source rocks:")
-      util.printout("---------------------------")
-      util.printout()
-      print_results(sources, true)
+      util.title("Rockspecs and source rocks:", porcelain)
+      print_results(sources, porcelain)
    end
    if next(binaries) and not flags["source"] then    
-      util.printout("Binary and pure-Lua rocks:")
-      util.printout("--------------------------")
-      util.printout()
-      print_results(binaries, true)
+      util.title("Binary and pure-Lua rocks:", porcelain)
+      print_results(binaries, porcelain)
    end
    return true
 end

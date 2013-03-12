@@ -10,15 +10,19 @@ local dir = require("luarocks.dir")
 local util = require("luarocks.util")
 local path = require("luarocks.path")
 
-local socket_ok, http = pcall(require, "socket.http")
-local _, ftp = pcall(require, "socket.ftp")
-local zip_ok, lrzip = pcall(require, "luarocks.tools.zip")
-local unzip_ok, luazip = pcall(require, "zip"); _G.zip = nil
-local lfs_ok, lfs = pcall(require, "lfs")
-local md5_ok, md5 = pcall(require, "md5")
-local posix_ok, posix = pcall(require, "posix")
+local socket_ok, zip_ok, unzip_ok, lfs_ok, md5_ok, posix_ok, _
+local http, ftp, lrzip, luazip, lfs, md5, posix
 
-local tar = require("luarocks.tools.tar")
+if cfg.fs_use_modules then
+   socket_ok, http = pcall(require, "socket.http")
+   _, ftp = pcall(require, "socket.ftp")
+   zip_ok, lrzip = pcall(require, "luarocks.tools.zip")
+   unzip_ok, luazip = pcall(require, "zip"); _G.zip = nil
+   lfs_ok, lfs = pcall(require, "lfs")
+   md5_ok, md5 = pcall(require, "md5")
+   posix_ok, posix = pcall(require, "posix")
+end
+
 local patch = require("luarocks.tools.patch")
 
 local dir_stack = {}
@@ -38,10 +42,6 @@ function Q(arg)
    return "'" .. arg:gsub("\\", "\\\\"):gsub("'", "'\\''") .. "'"
 end
 
-local function normalize(name)
-   return name:gsub("\\", "/"):gsub("/$", "")
-end
-
 --- Test is file/dir is writable.
 -- Warning: testing if a file/dir is writable does not guarantee
 -- that it will remain writable and therefore it is no replacement
@@ -50,7 +50,7 @@ end
 -- @return boolean: true if file exists, false otherwise.
 function is_writable(file)
    assert(file)
-   file = normalize(file)
+   file = dir.normalize(file)
    local result
    if fs.is_dir(file) then
       local file2 = dir.path(file, '.tmpluarockstestwritable')
@@ -72,7 +72,7 @@ end
 -- @return string or nil: name of temporary directory or nil on failure.
 function make_temp_dir(name)
    assert(type(name) == "string")
-   name = normalize(name)
+   name = dir.normalize(name)
 
    local temp_dir = (os.getenv("TMP") or "/tmp") .. "/luarocks_" .. name:gsub(dir.separator, "_") .. "-" .. tostring(math.floor(math.random() * 10000))
    if fs.make_dir(temp_dir) then
@@ -105,7 +105,7 @@ end
 -- @return boolean: true if the MD5 checksum for 'file' equals 'md5sum', false if not
 -- or if it could not perform the check for any reason.
 function check_md5(file, md5sum)
-   file = normalize(file)
+   file = dir.normalize(file)
    local computed = fs.get_md5(file)
    if not computed then
       return false
@@ -151,7 +151,7 @@ end
 -- @param d string: The directory to switch to.
 function change_dir(d)
    table.insert(dir_stack, lfs.currentdir())
-   d = normalize(d)
+   d = dir.normalize(d)
    lfs.chdir(d)
 end
 
@@ -182,7 +182,7 @@ end
 -- @return boolean: true on success, false on failure.
 function make_dir(directory)
    assert(type(directory) == "string")
-   directory = normalize(directory)
+   directory = dir.normalize(directory)
    local path = nil
    if directory:sub(2, 2) == ":" then
      path = directory:sub(1, 2)
@@ -212,7 +212,7 @@ end
 -- @param d string: pathname of directory to remove.
 function remove_dir_if_empty(d)
    assert(d)
-   d = normalize(d)
+   d = dir.normalize(d)
    lfs.rmdir(d)
 end
 
@@ -222,7 +222,7 @@ end
 -- @param d string: pathname of directory to remove.
 function remove_dir_tree_if_empty(d)
    assert(d)
-   d = normalize(d)
+   d = dir.normalize(d)
    for i=1,10 do
       lfs.rmdir(d)
       d = dir.dir_name(d)
@@ -238,8 +238,8 @@ end
 -- plus an error message.
 function copy(src, dest, perms)
    assert(src and dest)
-   src = normalize(src)
-   dest = normalize(dest)
+   src = dir.normalize(src)
+   dest = dir.normalize(dest)
    local destmode = lfs.attributes(dest, "mode")
    if destmode == "directory" then
       dest = dir.path(dest, dir.base_name(src))
@@ -247,7 +247,7 @@ function copy(src, dest, perms)
    if not perms then perms = fs.get_permissions(src) end
    local src_h, err = io.open(src, "rb")
    if not src_h then return nil, err end
-   local dest_h, err = io.open(dest, "wb+")
+   local dest_h, err = io.open(dest, "w+b")
    if not dest_h then src_h:close() return nil, err end
    while true do
       local block = src_h:read(8192)
@@ -291,8 +291,8 @@ end
 -- plus an error message.
 function copy_contents(src, dest)
    assert(src and dest)
-   src = normalize(src)
-   dest = normalize(dest)
+   src = dir.normalize(src)
+   dest = dir.normalize(dest)
    assert(lfs.attributes(src, "mode") == "directory")
 
    for file in lfs.dir(src) do
@@ -333,7 +333,7 @@ end
 -- @param name string: Pathname of source
 -- @return boolean: true on success, false on failure.
 function delete(name)
-   name = normalize(name)
+   name = dir.normalize(name)
    return recursive_delete(name) or false
 end
 
@@ -347,7 +347,7 @@ function list_dir(at)
    if not at then
       at = fs.current_dir()
    end
-   at = normalize(at)
+   at = dir.normalize(at)
    if not fs.is_dir(at) then
       return {}
    end
@@ -388,7 +388,7 @@ function find(at)
    if not at then
       at = fs.current_dir()
    end
-   at = normalize(at)
+   at = dir.normalize(at)
    if not fs.is_dir(at) then
       return {}
    end
@@ -402,7 +402,7 @@ end
 -- @return boolean: true if file exists, false otherwise.
 function exists(file)
    assert(file)
-   file = normalize(file)
+   file = dir.normalize(file)
    return type(lfs.attributes(file)) == "table"
 end
 
@@ -411,7 +411,7 @@ end
 -- @return boolean: true if it is a directory, false otherwise.
 function is_dir(file)
    assert(file)
-   file = normalize(file)
+   file = dir.normalize(file)
    return lfs.attributes(file, "mode") == "directory"
 end
 
@@ -420,12 +420,12 @@ end
 -- @return boolean: true if it is a file, false otherwise.
 function is_file(file)
    assert(file)
-   file = normalize(file)
+   file = dir.normalize(file)
    return lfs.attributes(file, "mode") == "file"
 end
 
 function set_time(file, time)
-   file = normalize(file)
+   file = dir.normalize(file)
    return lfs.touch(file, time)
 end
 
@@ -488,7 +488,23 @@ local redirect_protocols = {
 
 local function http_request(url, http, loop_control)
    local result = {}
-   local res, status, headers, err = http.request { url = url, proxy = cfg.proxy, redirect = false, sink = ltn12.sink.table(result) }
+   
+   local proxy = cfg.proxy
+   if type(proxy) ~= "string" then proxy = nil end
+   -- LuaSocket's http.request crashes when given URLs missing the scheme part.
+   if proxy and not proxy:find("://") then
+      proxy = "http://" .. proxy
+   end
+   
+   local res, status, headers, err = http.request {
+      url = url,
+      proxy = proxy,
+      redirect = false,
+      sink = ltn12.sink.table(result),
+      headers = {
+         ["user-agent"] = cfg.user_agent.." via LuaSocket"
+      },
+   }
    if not res then
       return nil, status
    elseif status == 301 or status == 302 then
@@ -654,9 +670,28 @@ end
 -- plus an error message.
 function check_command_permissions(flags)
    local root_dir = path.root_dir(cfg.rocks_dir)
-   if not flags["local"] and not (fs.is_writable(root_dir) or fs.is_writable(dir.dir_name(root_dir))) then
-      return nil, "Your user does not have write permissions in " .. root_dir ..
-                  " \n-- you may want to run as a privileged user or use your local tree with --local."
+   local ok = true
+   local err = ""
+   for _, dir in ipairs { cfg.rocks_dir, root_dir } do
+      if fs.exists(dir) and not fs.is_writable(dir) then
+         ok = false
+         err = "Your user does not have write permissions in " .. dir
+         break
+      end
    end
-   return true
+   local root_parent = dir.dir_name(root_dir)
+   if ok and not fs.exists(root_dir) and not fs.is_writable(root_parent) then
+      ok = false
+      err = root_dir.." does not exist and your user does not have write permissions in " .. root_parent
+   end
+   if ok then
+      return true
+   else
+      if flags["local"] then
+         err = err .. " \n-- please check your permissions."
+      else
+         err = err .. " \n-- you may want to run as a privileged user or use your local tree with --local."
+      end
+      return nil, err
+   end
 end

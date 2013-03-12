@@ -1,6 +1,6 @@
 
 --- Functions for managing the repository on disk.
-module("luarocks.rep", package.seeall)
+module("luarocks.repos", package.seeall)
 
 local fs = require("luarocks.fs")
 local path = require("luarocks.path")
@@ -14,7 +14,7 @@ local deps = require("luarocks.deps")
 -- @param name string: a package name.
 -- @return table or nil: An array of strings listing installed
 -- versions of a package, or nil if none is available.
-function get_versions(name)
+local function get_installed_versions(name)
    assert(type(name) == "string")
    
    local dirs = fs.list_dir(path.versions_dir(name))
@@ -51,22 +51,6 @@ local function recurse_rock_manifest_tree(file_tree, action)
       return true
    end
    return do_recurse_rock_manifest_tree(file_tree, "", "")
-end
-
-local function store_package_data(result, name, sub, prefix)
-   assert(type(result) == "table")
-   assert(type(name) == "string")
-   assert(type(sub) == "table" or type(sub) == "string")
-   assert(type(prefix) == "string")
-
-   if type(sub) == "table" then
-      for sname, ssub in pairs(sub) do
-         store_package_data(result, sname, ssub, prefix..name.."/")
-      end
-   elseif type(sub) == "string" then
-      local pathname = prefix..name
-      result[path.path_to_module(pathname)] = pathname
-   end
 end
 
 local function store_package_data(result, name, file_tree)
@@ -229,7 +213,7 @@ function deploy_files(name, version, wrap_bin_scripts)
                else
                   target = new_target
                end
-	    end
+            end
             fs.make_dir(dir.dir_name(target))
             ok, err = move_fn(source, target)
             fs.remove_dir_tree_if_empty(dir.dir_name(source))
@@ -259,7 +243,11 @@ end
 -- Version numbers are compared as exact string comparison.
 -- @param name string: name of package
 -- @param version string: package version in string format
-function delete_version(name, version)
+-- @param quick boolean: do not try to fix the versioned name
+-- of another version that provides the same module that
+-- was deleted. This is used during 'purge', as every module
+-- will be eventually deleted.
+function delete_version(name, version, quick)
    assert(type(name) == "string")
    assert(type(version) == "string")
 
@@ -274,11 +262,13 @@ function delete_version(name, version)
                if not ok then return nil, "Failed deleting "..versioned end
             else
                local ok = fs.delete(target)
-               local next_name, next_version = manif.find_next_provider(target)
-               if next_name then
-                  local versioned = path.versioned_name(target, deploy_dir, next_name, next_version)
-                  fs.move(versioned, target)
-                  fs.remove_dir_tree_if_empty(dir.dir_name(versioned))
+               if not quick then
+                  local next_name, next_version = manif.find_next_provider(target)
+                  if next_name then
+                     local versioned = path.versioned_name(target, deploy_dir, next_name, next_version)
+                     fs.move(versioned, target)
+                     fs.remove_dir_tree_if_empty(dir.dir_name(versioned))
+                  end
                end
                fs.remove_dir_tree_if_empty(dir.dir_name(target))
                if not ok then return nil, "Failed deleting "..target end
@@ -306,7 +296,7 @@ function delete_version(name, version)
    if err then return nil, err end
 
    fs.delete(path.install_dir(name, version))
-   if not get_versions(name) then
+   if not get_installed_versions(name) then
       fs.delete(dir.path(cfg.rocks_dir, name))
    end
    return true

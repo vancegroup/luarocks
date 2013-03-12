@@ -4,7 +4,7 @@
 module("luarocks.install", package.seeall)
 
 local path = require("luarocks.path")
-local rep = require("luarocks.rep")
+local repos = require("luarocks.repos")
 local fetch = require("luarocks.fetch")
 local util = require("luarocks.util")
 local fs = require("luarocks.fs")
@@ -23,9 +23,11 @@ or a filename of a locally available rock.
 
 --- Install a binary rock.
 -- @param rock_file string: local or remote filename of a rock.
+-- @param deps_mode: string: Which trees to check dependencies for:
+-- "none", "one", "order" or "all". 
 -- @return boolean or (nil, string, [string]): True if succeeded or 
 -- nil and an error message and an optional error code.
-function install_binary_rock(rock_file)
+function install_binary_rock(rock_file, deps_mode)
    assert(type(rock_file) == "string")
 
    local name, version, arch = path.parse_name(rock_file)
@@ -36,8 +38,8 @@ function install_binary_rock(rock_file)
    if arch ~= "all" and arch ~= cfg.arch then
       return nil, "Incompatible architecture "..arch, "arch"
    end
-   if rep.is_installed(name, version) then
-      rep.delete_version(name, version)
+   if repos.is_installed(name, version) then
+      repos.delete_version(name, version)
    end
    
    local rollback = util.schedule_function(function()
@@ -53,8 +55,12 @@ function install_binary_rock(rock_file)
       return nil, "Failed loading rockspec for installed package: "..err, errcode
    end
 
-   ok, err, errcode = deps.check_external_deps(rockspec, "install")
-   if err then return nil, err, errcode end
+   if deps_mode == "none" then
+      util.printerr("Warning: skipping dependency checks.")
+   else
+      ok, err, errcode = deps.check_external_deps(rockspec, "install")
+      if err then return nil, err, errcode end
+   end
 
    -- For compatibility with .rock files built with LuaRocks 1
    if not fs.exists(path.rock_manifest_file(name, version)) then
@@ -62,26 +68,28 @@ function install_binary_rock(rock_file)
       if err then return nil, err end
    end
 
-   ok, err, errcode = deps.fulfill_dependencies(rockspec)
-   if err then return nil, err, errcode end
+   if deps_mode ~= "none" then
+      ok, err, errcode = deps.fulfill_dependencies(rockspec, deps_mode)
+      if err then return nil, err, errcode end
+   end
 
    local wrap_bin_scripts = true
    if rockspec.deploy and rockspec.deploy.wrap_bin_scripts == false then
       wrap_bin_scripts = false
    end
 
-   ok, err = rep.deploy_files(name, version, rep.should_wrap_bin_scripts(rockspec))
+   ok, err = repos.deploy_files(name, version, repos.should_wrap_bin_scripts(rockspec))
    if err then return nil, err end
 
    util.remove_scheduled_function(rollback)
    rollback = util.schedule_function(function()
-      rep.delete_version(name, version)
+      repos.delete_version(name, version)
    end)
 
-   ok, err = rep.run_hook(rockspec, "post_install")
+   ok, err = repos.run_hook(rockspec, "post_install")
    if err then return nil, err end
    
-   ok, err = manif.update_manifest(name, version)
+   ok, err = manif.update_manifest(name, version, nil, deps_mode)
    if err then return nil, err end
    
    local license = ""
@@ -119,9 +127,9 @@ function run(...)
    if name:match("%.rockspec$") or name:match("%.src%.rock$") then
       util.printout("Using "..name.."... switching to 'build' mode")
       local build = require("luarocks.build")
-      return build.run(name, flags["local"] and "--local")
+      return build.run(name, deps.get_deps_mode(flags), flags["local"] and "--local")
    elseif name:match("%.rock$") then
-      return install_binary_rock(name)
+      return install_binary_rock(name, deps.get_deps_mode(flags))
    else
       local search = require("luarocks.search")
       local results, err = search.find_suitable_rock(search.make_query(name:lower(), version))
@@ -134,9 +142,7 @@ function run(...)
       else
          util.printout()
          util.printerr("Could not determine which rock to install.")
-         util.printout()
-         util.printout("Search results:")
-         util.printout("---------------")
+         util.title("Search results:")
          search.print_results(results)
          return nil, (next(results) and "Please narrow your query." or "No results found.")
       end

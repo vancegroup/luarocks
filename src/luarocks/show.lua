@@ -23,7 +23,7 @@ With these flags, return only the desired information:
 --deps      packages this package depends on
 --rockspec  the full path of the rockspec file
 --mversion  the package version
---tree      local tree where rock is installed
+--rock-tree local tree where rock is installed
 --rock-dir  data directory of the installed rock
 ]]
 
@@ -55,6 +55,17 @@ local function format_text(text)
    return (table.concat(paragraphs, "\n\n"):gsub("%s$", ""))
 end
 
+local function module_name(mod, filename, name, version, repo, manifest)
+   local base_dir
+   if filename:match("%.lua$") then
+      base_dir = path.deploy_lua_dir(repo)
+   else
+      base_dir = path.deploy_lib_dir(repo)
+   end
+   
+   return dir.path(base_dir, filename)
+end
+
 --- Driver function for "show" command.
 -- @param name or nil: an existing package name.
 -- @param version string or nil: a version may also be passed.
@@ -68,23 +79,28 @@ function run(...)
    local query = search.make_query(name, version)
    query.exact_name = true
    local tree_map = {}
-   for _, tree in ipairs(cfg.rocks_trees) do
+   local trees = cfg.rocks_trees
+   if flags["tree"] then
+      trees = { flags["tree"] }
+   end
+   for _, tree in ipairs(trees) do
       local rocks_dir = path.rocks_dir(tree)
       tree_map[rocks_dir] = tree
       search.manifest_search(results, rocks_dir, query)
    end
 
    if not next(results) then --
-      return nil,"cannot find package "..name.."\nUse 'list' to find installed rocks"
+      return nil,"cannot find package "..name.." "..(version or "").."\nUse 'list' to find installed rocks."
    end
 
-   local version,repo_url
+   version = nil
+   local repo_url
    local package, versions = util.sortedpairs(results)()
    --question: what do we do about multiple versions? This should
    --give us the latest version on the last repo (which is usually the global one)
-   for vs, repos in util.sortedpairs(versions, deps.compare_versions) do
+   for vs, repositories in util.sortedpairs(versions, deps.compare_versions) do
       if not version then version = vs end
-      for _, rp in ipairs(repos) do repo_url = rp.repo end
+      for _, rp in ipairs(repositories) do repo_url = rp.repo end
    end
 
 
@@ -99,7 +115,7 @@ function run(...)
    if not manifest then return nil,err end
    local minfo = manifest.repository[name][version][1]
 
-   if flags["tree"] then util.printout(repo)
+   if flags["rock-tree"] then util.printout(repo)
    elseif flags["rock-dir"] then util.printout(directory)
    elseif flags["home"] then util.printout(descript.homepage)
    elseif flags["modules"] then util.printout(keys_as_string(minfo.modules))
@@ -124,7 +140,9 @@ function run(...)
       if next(minfo.modules) then
          util.printout()
          util.printout("Modules:")
-         util.printout("\t"..keys_as_string(minfo.modules, "\n\t"))
+         for mod, filename in util.sortedpairs(minfo.modules) do
+            util.printout("\t"..mod.." ("..path.which(mod, filename, name, version, repo, manifest)..")")
+         end
       end
       if next(minfo.dependencies) then
          util.printout()

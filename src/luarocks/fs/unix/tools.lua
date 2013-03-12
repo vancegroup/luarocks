@@ -10,19 +10,8 @@ local dir_stack = {}
 
 local vars = cfg.variables
 
---- Run the given command.
--- The command is executed in the current directory in the directory stack.
--- @param cmd string: No quoting/escaping is applied to the command.
--- @return boolean: true if command succeeds (status code 0), false
--- otherwise.
-function execute_string(cmd)
-   local actual_cmd = "cd " .. fs.Q(fs.current_dir()) .. " && " .. cmd
-   local code = os.execute(actual_cmd)
-   if code == 0 or code == true then
-      return true
-   else
-      return false
-   end
+local function command_at(directory, cmd)
+   return "cd " .. fs.Q(directory) .. " && " .. cmd
 end
 
 --- Obtain current directory.
@@ -36,6 +25,20 @@ function current_dir()
       current = fs.absolute_name(directory, current)
    end
    return current
+end
+
+--- Run the given command.
+-- The command is executed in the current directory in the directory stack.
+-- @param cmd string: No quoting/escaping is applied to the command.
+-- @return boolean: true if command succeeds (status code 0), false
+-- otherwise.
+function execute_string(cmd)
+   local code = os.execute(command_at(fs.current_dir(), cmd))
+   if code == 0 or code == true then
+      return true
+   else
+      return false
+   end
 end
 
 --- Change the current directory.
@@ -77,7 +80,7 @@ end
 -- @param directory string: pathname of directory to remove.
 function remove_dir_if_empty(directory)
    assert(directory)
-   fs.execute_string(vars.RMDIR.." "..fs.Q(directory).." 1> /dev/null 2> /dev/null")
+   fs.execute_string(fs.quiet(vars.RMDIR.." "..fs.Q(directory)))
 end
 
 --- Remove a directory if it is empty.
@@ -86,7 +89,7 @@ end
 -- @param directory string: pathname of directory to remove.
 function remove_dir_tree_if_empty(directory)
    assert(directory)
-   fs.execute_string(vars.RMDIR.." -p "..fs.Q(directory).." 1> /dev/null 2> /dev/null")
+   fs.execute_string(fs.quiet(vars.RMDIR.." -p "..fs.Q(directory)))
 end
 
 --- Copy a file.
@@ -121,7 +124,7 @@ end
 -- plus an error message.
 function copy_contents(src, dest)
    assert(src and dest)
-   if fs.execute_string(vars.CP.." -pPR "..fs.Q(src).."/* "..fs.Q(dest).." 1> /dev/null 2>/dev/null") then
+   if fs.execute_string(fs.quiet(vars.CP.." -pPR "..fs.Q(src).."/* "..fs.Q(dest))) then
       return true
    else
       return false, "Failed copying "..src.." to "..dest
@@ -134,10 +137,10 @@ end
 function delete(arg)
    assert(arg)
    assert(arg:sub(1,1) == "/")
-   return fs.execute_string(vars.RM.." -rf " .. fs.Q(arg) .. " 1> /dev/null 2>/dev/null")
+   return fs.execute_string(fs.quiet(vars.RM.." -rf " .. fs.Q(arg)))
 end
 
---- List the contents of a directory. 
+--- List the contents of a directory.
 -- @param at string or nil: directory to list (will be the current
 -- directory if none is given).
 -- @return table: an array of strings with the filenames representing
@@ -151,7 +154,7 @@ function list_dir(at)
       return {}
    end
    local result = {}
-   local pipe = io.popen("cd "..fs.Q(at).." && "..vars.LS)
+   local pipe = io.popen(command_at(at, vars.LS))
    for file in pipe:lines() do
       table.insert(result, file)
    end
@@ -159,7 +162,7 @@ function list_dir(at)
    return result
 end
 
---- Recursively scan the contents of a directory. 
+--- Recursively scan the contents of a directory.
 -- @param at string or nil: directory to scan (will be the current
 -- directory if none is given).
 -- @return table: an array of strings with the filenames representing
@@ -173,7 +176,7 @@ function find(at)
       return {}
    end
    local result = {}
-   local pipe = io.popen("cd "..fs.Q(at).." && "..vars.FIND.." * 2>/dev/null") 
+   local pipe = io.popen(command_at(at, vars.FIND.." * 2>/dev/null"))
    for file in pipe:lines() do
       table.insert(result, file)
    end
@@ -198,20 +201,12 @@ function unzip(zipfile)
    return fs.execute(vars.UNZIP, zipfile)
 end
 
---- Test for existance of a file.
+--- Test is file/directory exists
 -- @param file string: filename to test
 -- @return boolean: true if file exists, false otherwise.
 function exists(file)
    assert(file)
-   return fs.execute(vars.TEST, "-r", file)
-end
-
---- Test is file/directory is writable.
--- @param file string: filename to test
--- @return boolean: true if file exists, false otherwise.
-function is_writable(file)
-   assert(file)
-   return fs.execute(vars.TEST, "-w", file)
+   return fs.execute(vars.TEST, "-e", file)
 end
 
 --- Test is pathname is a directory.
@@ -242,7 +237,7 @@ function download(url, filename)
    assert(type(filename) == "string" or not filename)
 
    if cfg.downloader == "wget" then
-      local wget_cmd = vars.WGET.." --no-check-certificate --no-cache --user-agent="..cfg.user_agent.." --quiet --continue "
+      local wget_cmd = vars.WGET.." --no-check-certificate --no-cache --user-agent='"..cfg.user_agent.." via wget' --quiet --continue "
       if filename then
          return fs.execute(wget_cmd.." --output-document ", filename, url)
       else
@@ -250,7 +245,7 @@ function download(url, filename)
       end
    elseif cfg.downloader == "curl" then
       filename = filename or dir.base_name(url)
-      return fs.execute_string(vars.CURL.." -L --user-agent "..cfg.user_agent.." "..fs.Q(url).." 2> /dev/null 1> "..fs.Q(filename))
+      return fs.execute_string(vars.CURL.." -L --user-agent '"..cfg.user_agent.." via curl' "..fs.Q(url).." 2> /dev/null 1> "..fs.Q(filename))
    end
 end
 
@@ -278,10 +273,8 @@ function unpack_archive(archive)
 
    local ok
    if archive:match("%.tar%.gz$") or archive:match("%.tgz$") then
-      -- ok = fs.execute("tar zxvpf ", archive)
          ok = fs.execute_string(vars.GUNZIP.." -c "..archive.."|"..vars.TAR.." -xf -")
    elseif archive:match("%.tar%.bz2$") then
-      -- ok = fs.execute("tar jxvpf ", archive)
          ok = fs.execute_string(vars.BUNZIP2.." -c "..archive.."|tar -xf -")
    elseif archive:match("%.zip$") then
       ok = fs.execute(vars.UNZIP, archive)
