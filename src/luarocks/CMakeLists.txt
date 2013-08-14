@@ -1,57 +1,60 @@
+# find * -name "*.lua" | sed "s/^/\t/"
 
 set(LUAROCKS_FILES
-	fs/unix/tools.lua
-	fs/unix.lua
-	fs/win32/tools.lua
-	fs/win32.lua
-	fs/lua.lua
-	persist.lua
-	list.lua
-	require.lua
-	rep.lua
-	dir.lua
-	make_manifest.lua
-	command_line.lua
-	install.lua
+	add.lua
+	admin_remove.lua
+	build/builtin.lua
+	build/make.lua
 	build/command.lua
 	build/cmake.lua
-	build/make.lua
-	build/builtin.lua
+	build.lua
+	cache.lua
+	cfg.lua
+	command_line.lua
+	deps.lua
+	dir.lua
+	download.lua
 	fetch/cvs.lua
 	fetch/git.lua
+	fetch/git_file.lua
 	fetch/sscm.lua
-	tools/patch.lua
 	fetch/svn.lua
-	tools/zip.lua
-	tools/tar.lua
-	pack.lua
-	type_check.lua
-	make.lua
-	path.lua
-	remove.lua
+	fetch/hg.lua
+	fetch.lua
+	fs/unix/tools.lua
+	fs/win32/tools.lua
+	fs/lua.lua
+	fs/unix.lua
+	fs/win32.lua
 	fs.lua
+	help.lua
+	index.lua
+	install.lua
+	lint.lua
+	list.lua
+	loader.lua
+	make.lua
+	make_manifest.lua
+	manif_core.lua
 	manif.lua
-	add.lua
-	deps.lua
-	build.lua
+	new_version.lua
+	pack.lua
+	path.lua
+	persist.lua
+	purge.lua
+	refresh_cache.lua
+	remove.lua
+	repos.lua
+	require.lua
 	search.lua
 	show.lua
-	manif_core.lua
-	fetch.lua
+	tools/tar.lua
+	tools/zip.lua
+	tools/patch.lua
+	type_check.lua
 	unpack.lua
-	validate.lua
-	cfg.lua
-	download.lua
-	help.lua
 	util.lua
-	index.lua
-	cache.lua
-	add.lua
-	refresh_cache.lua
-	loader.lua
-	admin_remove.lua
-	fetch/hg.lua
-	fetch/git_file.lua)
+	validate.lua)
 
 foreach(FN ${LUAROCKS_FILES})
 	get_filename_component(filedir ${FN} PATH)
